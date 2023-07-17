@@ -2,9 +2,10 @@ import os
 import hashlib
 import argparse
 import time
+from typing import Dict, Any
 
 
-def calculate_md5(filepath):
+def calculate_md5(filepath: str) -> str:
     hash_md5 = hashlib.md5()
     with open(filepath, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
@@ -12,23 +13,31 @@ def calculate_md5(filepath):
     return hash_md5.hexdigest()
 
 
-def synchronize_folders(source, replica, log_file):
+def get_files_md5(folder_path: str) -> Dict[str, str]:
+    files_md5 = {}
+    for root, _, files in os.walk(folder_path):
+        for file in files:
+            file_path = os.path.join(root, file)
+            relative_path = os.path.relpath(file_path, folder_path)
+            files_md5[relative_path] = calculate_md5(file_path)
+    return files_md5
+
+
+def copy_file(source_path: str, replica_path: str) -> None:
+    replica_dir = os.path.dirname(replica_path)
+    if not os.path.exists(replica_dir):
+        os.makedirs(replica_dir)
+
+    with open(source_path, 'rb') as src_file, open(replica_path, 'wb') as dest_file:
+        dest_file.write(src_file.read())
+
+
+def synchronize_folders(source: str, replica: str, log_file: Any) -> None:
     if not os.path.exists(replica):
         os.makedirs(replica)
 
-    source_files = {}
-    for root, _, files in os.walk(source):
-        for file in files:
-            file_path = os.path.join(root, file)
-            relative_path = os.path.relpath(file_path, source)
-            source_files[relative_path] = calculate_md5(file_path)
-
-    replica_files = {}
-    for root, _, files in os.walk(replica):
-        for file in files:
-            file_path = os.path.join(root, file)
-            relative_path = os.path.relpath(file_path, replica)
-            replica_files[relative_path] = calculate_md5(file_path)
+    source_files = get_files_md5(source)
+    replica_files = get_files_md5(replica)
 
     for rel_path, md5_hash in source_files.items():
         source_file = os.path.join(source, rel_path)
@@ -37,12 +46,7 @@ def synchronize_folders(source, replica, log_file):
         if rel_path in replica_files and md5_hash == replica_files[rel_path]:
             continue
 
-        replica_dir = os.path.dirname(replica_file)
-        if not os.path.exists(replica_dir):
-            os.makedirs(replica_dir)
-
-        with open(source_file, 'rb') as src_file, open(replica_file, 'wb') as dest_file:
-            dest_file.write(src_file.read())
+        copy_file(source_file, replica_file)
 
         log_entry = f"Copied: {source_file} -> {replica_file}\n"
         log_file.write(log_entry)
@@ -50,10 +54,11 @@ def synchronize_folders(source, replica, log_file):
 
     for rel_path in set(replica_files) - set(source_files):
         replica_file = os.path.join(replica, rel_path)
-        os.remove(replica_file)
-        log_entry = f"Removed: {replica_file}\n"
-        log_file.write(log_entry)
-        print(log_entry.strip())
+        if os.path.exists(replica_file):
+            os.remove(replica_file)
+            log_entry = f"Removed: {replica_file}\n"
+            log_file.write(log_entry)
+            print(log_entry.strip())
 
 
 if __name__ == "__main__":
