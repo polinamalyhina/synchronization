@@ -5,7 +5,7 @@ This Python script allows you to synchronize two folders, ensuring that the repl
 ## Usage
 
 ```
-python synchronize_folders.py /path/to/source_folder /path/to/replica_folder interval /path/to/log_file.txt
+python sync_script.py /path/to/source_folder /path/to/replica_folder interval /path/to/log_file.txt
 ```
 
 - `/path/to/source_folder`: The path to the source folder that needs to be synchronized.
