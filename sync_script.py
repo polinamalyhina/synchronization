@@ -1,10 +1,32 @@
-
 import os
 import hashlib
 import argparse
 import time
 import logging
-from typing import Dict, Any
+from typing import Any
+
+
+def log_action(action: str):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            try:
+                result = func(*args, **kwargs)
+                logging.info(f"Success with {action} operation")
+                return result
+            except Exception as e:
+                logging.error(f"Error while {action} operation: {e}")
+                raise e
+
+        return wrapper
+
+    return decorator
+
+
+def make_set(folder):
+    folder_files_set = set(
+        os.path.relpath(os.path.join(root, file), folder) for root, _, files in
+        os.walk(folder) for file in files)
+    return folder_files_set
 
 
 def calculate_md5(filepath: str) -> str:
@@ -15,7 +37,7 @@ def calculate_md5(filepath: str) -> str:
     return hash_md5.hexdigest()
 
 
-def copy_file(source_path: str, replica_path: str) -> None:
+def copy_file_by_chunks(source_path: str, replica_path: str) -> None:
     replica_dir = os.path.dirname(replica_path)
     if not os.path.exists(replica_dir):
         os.makedirs(replica_dir)
@@ -38,33 +60,53 @@ def remove_directory_recursive(directory_path: str) -> None:
     os.rmdir(directory_path)
 
 
-def synchronize_folders(source: str, replica: str, log_file: Any) -> None:
-    source_files_set = set(os.path.relpath(os.path.join(root, file), source) for root, _, files in os.walk(source) for file in files)
-    replica_files_set = set(os.path.relpath(os.path.join(root, file), replica) for root, _, files in os.walk(replica) for file in files)
+@log_action("COPY_Files")
+def copy_files(source, replica):
+    source_files_set = make_set(source)
+    replica_files_set = make_set(replica)
 
-    
     for file in source_files_set - replica_files_set:
         source_path = os.path.join(source, file)
         replica_path = os.path.join(replica, file)
 
-        try:
-            copy_file(source_path, replica_path)
-            logging.info(f"Copied: {source_path} -> {replica_path}")
-        except Exception as e:
-            logging.error(f"Error while copying {source_path}: {e}")
+        copy_file_by_chunks(source_path, replica_path)
 
 
-    
+@log_action("COPY_Dirs")
+def copy_dirs(source, replica):
+    for root, dirs, _ in os.walk(source):
+        for d in dirs:
+            source_dir = os.path.join(root, d)
+            replica_dir = os.path.join(replica, os.path.relpath(source_dir, source))
+            if not os.path.exists(replica_dir):
+                os.makedirs(replica_dir)
+
+
+@log_action("REMOVE_Files")
+def remove_files(source, replica):
+    source_files_set = make_set(source)
+    replica_files_set = make_set(replica)
+
     for file in replica_files_set - source_files_set:
         replica_path = os.path.join(replica, file)
 
-        try:
-            os.remove(replica_path)
-            logging.info(f"Removed: {replica_path}")
-        except Exception as e:
-            logging.error(f"Error while removing {replica_path}: {e}")
+        os.remove(replica_path)
 
 
+@log_action("REMOVE_Dirs")
+def remove_dirs(source, replica):
+    for root, dirs, _ in os.walk(replica, topdown=False):
+        for d in dirs:
+            replica_dir = os.path.join(root, d)
+            source_dir = os.path.join(source, os.path.relpath(replica_dir, replica))
+            if not os.path.exists(source_dir):
+                remove_directory_recursive(replica_dir)
+
+
+@log_action("UPDATE_Files")
+def update_files(source, replica):
+    source_files_set = make_set(source)
+    replica_files_set = make_set(replica)
 
     for file in source_files_set & replica_files_set:
         source_path = os.path.join(source, file)
@@ -75,38 +117,16 @@ def synchronize_folders(source: str, replica: str, log_file: Any) -> None:
             replica_md5 = calculate_md5(replica_path)
 
             if source_md5 != replica_md5:
-                try:
-                    os.remove(replica_path)
-                    copy_file(source_path, replica_path)
-                    logging.info(f"Updated: {source_path} -> {replica_path}")
-                except Exception as e:
-                    logging.error(f"Error while updating {replica_path}: {e}")
-
-    
-    for root, dirs, _ in os.walk(source):
-        for d in dirs:
-            source_dir = os.path.join(root, d)
-            replica_dir = os.path.join(replica, os.path.relpath(source_dir, source))
-            if not os.path.exists(replica_dir):
-                try:
-                    os.makedirs(replica_dir)
-                    logging.info(f"Created directory: {replica_dir}")
-                except Exception as e:
-                    logging.error(f"Error while creating directory {replica_dir}: {e}")
+                os.remove(replica_path)
+                copy_file_by_chunks(source_path, replica_path)
 
 
-    for root, dirs, _ in os.walk(replica, topdown=False):
-        for d in dirs:
-            replica_dir = os.path.join(root, d)
-            source_dir = os.path.join(source, os.path.relpath(replica_dir, replica))
-            if not os.path.exists(source_dir):
-                try:
-                    remove_directory_recursive(replica_dir)
-                    logging.info(f"Removed directory: {replica_dir}")
-                except Exception as e:
-                    logging.error(f"Error while removing directory {replica_dir}: {e}")
-
-
+def synchronize_folders(source: str, replica: str, log_file: Any) -> None:
+    copy_files(source, replica)
+    remove_files(source, replica)
+    update_files(source, replica)
+    copy_dirs(source, replica)
+    remove_dirs(source, replica)
     logging.info(f"--- Synchronization at {time.strftime('%Y-%m-%d %H:%M:%S')} ---")
 
 
