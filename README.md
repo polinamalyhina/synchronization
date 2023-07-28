@@ -17,23 +17,19 @@ python sync_script.py /path/to/source_folder /path/to/replica_folder interval /p
 
 The script uses the MD5 hash to compare files between the source and replica folders. Here's how it works:
 
-1. The MD5 hash of each file in both the source and replica folders is calculated.
-2. The script compares the list of files and their MD5 hashes between the source and replica folders.
-3. Files that are missing or have different MD5 hashes in the replica folder will be copied from the source folder.
-4. Files that exist in the replica folder but not in the source folder will be removed from the replica folder.
+1. The script compares the list of files between the source and replica folders.
+2. The MD5 hash of same files in both the source and replica folders is calculated.
+3. Files and dirs that are missing or have different MD5 hashes in the replica folder will be copied from the source folder.
+4. Files and dirs that exist in the replica folder but not in the source folder will be removed from the replica folder.
 
 ## Requirements
 
 The script relies on the Python standard library and does not use any third-party libraries for folder synchronization.
 
-## Analysis
+## Updates
 
-Advantages:
-
-- Hash functions, such as MD5, provide efficient detection of file changes, allowing quick determination of which files need to be copied or removed during synchronization.
-- Calculating the hash takes a small amount of time, even for large files, and is independent of folder sizes or structure.
-
-Disadvantages:
-
-- Performing a full hash recalculation for each file during every synchronization may take more time than recursive comparison when changes are minimal.
-- Copying all files anew may require more input-output (I/O) operations and consume more disk space, especially for large files.
+- Updated the copying algorithm to improve performance. Files are now copied in parts for faster and more efficient copying process.
+- Improved the synchronization algorithm. Now, extra and unnecessary files are simply copied and deleted without the need to calculate hashes, reducing unnecessary overhead.
+- Added handling for empty directories to ensure complete synchronization of directory structures.
+- Revamped the logging system. Logging is now performed using a standard function and has been formatted as a decorator for better readability and maintainability.
+- Conducted code refactoring to enhance code quality and readability.
