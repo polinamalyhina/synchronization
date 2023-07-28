@@ -3,7 +3,7 @@ import hashlib
 import argparse
 import time
 import logging
-from typing import Any
+from typing import Any, Set, Tuple
 
 
 def log_action(action: str):
@@ -22,7 +22,7 @@ def log_action(action: str):
     return decorator
 
 
-def make_set(folder):
+def make_set(folder: str) -> Set[str]:
     folder_files_set = set(
         os.path.relpath(os.path.join(root, file), folder) for root, _, files in
         os.walk(folder) for file in files)
@@ -61,7 +61,7 @@ def remove_directory_recursive(directory_path: str) -> None:
 
 
 @log_action("COPY_Files")
-def copy_files(source, replica):
+def copy_files(source: str, replica: str) -> None:
     source_files_set = make_set(source)
     replica_files_set = make_set(replica)
 
@@ -73,7 +73,7 @@ def copy_files(source, replica):
 
 
 @log_action("COPY_Dirs")
-def copy_dirs(source, replica):
+def copy_dirs(source: str, replica: str) -> None:
     for root, dirs, _ in os.walk(source):
         for d in dirs:
             source_dir = os.path.join(root, d)
@@ -83,7 +83,7 @@ def copy_dirs(source, replica):
 
 
 @log_action("REMOVE_Files")
-def remove_files(source, replica):
+def remove_files(source: str, replica: str) -> None:
     source_files_set = make_set(source)
     replica_files_set = make_set(replica)
 
@@ -94,7 +94,7 @@ def remove_files(source, replica):
 
 
 @log_action("REMOVE_Dirs")
-def remove_dirs(source, replica):
+def remove_dirs(source: str, replica: str) -> None:
     for root, dirs, _ in os.walk(replica, topdown=False):
         for d in dirs:
             replica_dir = os.path.join(root, d)
@@ -104,7 +104,7 @@ def remove_dirs(source, replica):
 
 
 @log_action("UPDATE_Files")
-def update_files(source, replica):
+def update_files(source: str, replica: str) -> None:
     source_files_set = make_set(source)
     replica_files_set = make_set(replica)
 
